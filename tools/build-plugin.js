@@ -149,6 +149,8 @@ const rbxmx =
 
 fs.writeFileSync(path.join(outDir, "ForgeAIPlugin.rbxmx"), rbxmx);
 console.log("wrote downloads/ForgeAIPlugin.rbxmx (" + rbxmx.length + " bytes)");
+fs.writeFileSync(path.join(outDir, "ForgeAI.plugin.lua"), pluginLua);
+console.log("wrote downloads/ForgeAI.plugin.lua (" + pluginLua.length + " bytes)");
 
 /* ---------------- also validate with LuaFixer ---------------- */
 const fixerSrc = read(JS("fixer.js"));

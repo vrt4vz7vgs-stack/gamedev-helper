@@ -114,14 +114,49 @@ makeLabel("Subtitle", header, UDim2.new(0, 12, 0, 30), UDim2.new(1, -24, 0, 22),
 local promptBox = makeTextBox("PromptBox", root, UDim2.new(0, 12, 0, 68), UDim2.new(1, -72, 0, 38), 'e.g. "roblox combat system" or "hud"')
 local sendBtn = makeButton("SendBtn", root, UDim2.new(1, -56, 0, 68), UDim2.new(0, 44, 0, 38), "Generate", Color3.fromRGB(139, 92, 246))
 
-local resultsLabel = makeLabel("ResultsLabel", root, UDim2.new(0, 12, 0, 114), UDim2.new(1, -24, 0, 20), "Ask for: animations, gui, combat, npc ai, admin, data save...", Color3.fromRGB(120, 126, 152), 12, false)
+-- connect strip
+local connectRow = makeLayer("ConnectRow", root, UDim2.new(0, 12, 0, 114), UDim2.new(1, -24, 0, 30), Color3.fromRGB(24, 25, 36))
+local connDot = Instance.new("Frame")
+connDot.Name = "ConnDot"
+connDot.Parent = connectRow
+connDot.AnchorPoint = Vector2.new(0, 0.5)
+connDot.Position = UDim2.new(0, 8, 0.5, 0)
+connDot.Size = UDim2.fromOffset(10, 10)
+connDot.BackgroundColor3 = Color3.fromRGB(110, 116, 145)
+connDot.BorderSizePixel = 0
+local connDotCorner = Instance.new("UICorner")
+connDotCorner.CornerRadius = UDim.new(1, 0)
+connDotCorner.Parent = connDot
+local connLabel = makeLabel("ConnLabel", connectRow, UDim2.new(0, 24, 0, 0), UDim2.new(0, 160, 1, 0), "Disconnected", Color3.fromRGB(140, 145, 170), 12, false)
+local connectBtn = makeButton("ConnectBtn", connectRow, UDim2.new(1, -104, 0, 5), UDim2.new(0, 96, 0, 20), "Connect", Color3.fromRGB(52, 60, 90), 5)
+connectBtn.TextSize = 11
+
+local connected = false
+local function setConnected(value)
+	connected = value
+	connDot.BackgroundColor3 = value and Color3.fromRGB(52, 211, 153) or Color3.fromRGB(110, 116, 145)
+	connLabel.Text = value and "Connected" or "Disconnected"
+	connLabel.TextColor3 = value and Color3.fromRGB(52, 211, 153) or Color3.fromRGB(140, 145, 170)
+	connectBtn.Text = value and "Connected" or "Connect"
+	connectBtn.BackgroundColor3 = value and Color3.fromRGB(22, 101, 52) or Color3.fromRGB(52, 60, 90)
+	if value then
+		print("[ForgeAI] connected")
+	else
+		print("[ForgeAI] disconnected")
+	end
+end
+connectBtn.MouseButton1Click:Connect(function()
+	setConnected(not connected)
+end)
+
+local resultsLabel = makeLabel("ResultsLabel", root, UDim2.new(0, 12, 0, 152), UDim2.new(1, -24, 0, 20), "Ask for: animations, gui, combat, npc ai, admin, data save...", Color3.fromRGB(120, 126, 152), 12, false)
 
 local fileList = Instance.new("ScrollingFrame")
 fileList.Name = "FileList"
 fileList.Parent = root
 fileList.AnchorPoint = Vector2.new(0, 0)
-fileList.Position = UDim2.new(0, 12, 0, 138)
-fileList.Size = UDim2.new(1, -24, 0, 210)
+fileList.Position = UDim2.new(0, 12, 0, 176)
+fileList.Size = UDim2.new(1, -24, 0, 168)
 fileList.BackgroundColor3 = Color3.fromRGB(21, 22, 32)
 fileList.BorderSizePixel = 0
 fileList.ScrollBarThickness = 6
@@ -133,11 +168,11 @@ local fileLayout = Instance.new("UIListLayout")
 fileLayout.Parent = fileList
 fileLayout.Padding = UDim.new(0, 6)
 
-local previewBox = makeTextBox("PreviewBox", root, UDim2.new(0, 12, 0, 356), UDim2.new(1, -24, 0, 140), "Click a file to preview its code.", true)
-local previewTitle = makeLabel("PreviewTitle", root, UDim2.new(0, 12, 0, 332), UDim2.new(1, -24, 0, 18), "Preview", Color3.fromRGB(120, 126, 152), 11, true)
+local previewTitle = makeLabel("PreviewTitle", root, UDim2.new(0, 12, 0, 352), UDim2.new(1, -24, 0, 16), "Preview", Color3.fromRGB(120, 126, 152), 11, true)
+local previewBox = makeTextBox("PreviewBox", root, UDim2.new(0, 12, 0, 372), UDim2.new(1, -24, 0, 132), "Click a file to preview its code.", true)
 
-local insertAll = makeButton("InsertAll", root, UDim2.new(0, 12, 0, 504), UDim2.new(1, -24, 0, 36), "Insert all files", Color3.fromRGB(34, 211, 238))
-local statusLabel = makeLabel("Status", root, UDim2.new(0, 12, 0, 546), UDim2.new(1, -24, 0, 34), "ForgeAI - free, offline, no accounts", Color3.fromRGB(130, 136, 165), 11, false)
+local insertAll = makeButton("InsertAll", root, UDim2.new(0, 12, 0, 512), UDim2.new(1, -24, 0, 34), "Insert all files", Color3.fromRGB(34, 211, 238))
+local statusLabel = makeLabel("Status", root, UDim2.new(0, 12, 0, 550), UDim2.new(1, -24, 0, 34), "ForgeAI - free, offline, no accounts", Color3.fromRGB(130, 136, 165), 11, false)
 
 local helpMsg = "Try: roblox animation kit / hud / shop gui / combat system / npc ai / admin commands / data saving / checkpoint"
 

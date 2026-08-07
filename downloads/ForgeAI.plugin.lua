@@ -1,11 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
-<roblox xmlns:xmime="http://www.w3.org/2005/05/xmlmime" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.roblox.com/roblox.xsd" version="4">
-	<External>null</External>
-	<External>nil</External>
-	<Item class="Script" referent="RBX0">
-		<Properties>
-			<string name="Name">ForgeAI</string>
-			<ProtectedString name="Source"><![CDATA[--!strict
+--!strict
 -- ============================================================
 -- ForgeAI — Roblox Studio plugin
 -- "Lemonade-style" dock panel that generates verified Luau
@@ -1965,8 +1958,3 @@ Plugin.Unloading:Connect(function()
 end)
 
 showHelp()
-]]></ProtectedString>
-		</Properties>
-	</Item>
-	<Metadata signature="roblox" filetype="rbxmx" />
-</roblox>

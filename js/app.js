@@ -12,6 +12,7 @@
   const input = $("#input");
   const sendBtn = $("#sendBtn");
   const suggestionsEl = $("#suggestions");
+  let lastPack = null;
 
   /* ----------------------------------------------------------
      Intent detection
@@ -316,6 +317,7 @@
         });
       } else if (intent) {
         const pack = intent.pack();
+        lastPack = pack;
         addAssistantMessage(pack);
       } else {
         addAssistantMessage(HELP_PACK);
@@ -447,10 +449,206 @@
   });
 
   /* ----------------------------------------------------------
+     Plugin demo view (mirrors the Studio plugin dock)
+     ---------------------------------------------------------- */
+
+  const connectBtn = $("#connectBtn");
+  const connDot = $("#connDot");
+  const connLabel = $("#connLabel");
+  const connLog = $("#connLog");
+  const pluginPrompt = $("#pluginPrompt");
+  const pluginSend = $("#pluginSend");
+  const pluginFiles = $("#pluginFiles");
+
+  function logLine(text, cls) {
+    const p = document.createElement("p");
+    p.className = "log-line" + (cls ? " " + cls : "");
+    p.textContent = text;
+    connLog.appendChild(p);
+    connLog.scrollTop = connLog.scrollHeight;
+  }
+
+  let connected = false;
+  connectBtn.addEventListener("click", () => {
+    connected = !connected;
+    connDot.classList.toggle("on", connected);
+    connLabel.classList.toggle("on", connected);
+    connLabel.textContent = connected ? "Connected" : "Disconnected";
+    connectBtn.textContent = connected ? "Connected" : "Connect";
+    if (connected) {
+      logLine("[ForgeAI] connected to Roblox Studio", "ok");
+    } else {
+      logLine("[ForgeAI] disconnected", "err");
+    }
+  });
+
+  function fileLocation(filename) {
+    if (filename === "AnimationKit.lua") return "ReplicatedStorage";
+    if (filename.endsWith(".client.lua")) return "StarterPlayerScripts";
+    return "ServerScriptService";
+  }
+
+  function renderPluginFiles(pack) {
+    pluginFiles.innerHTML = "";
+    for (const file of pack.files) {
+      const row = document.createElement("div");
+      row.className = "plugin-file-row";
+      const name = document.createElement("span");
+      name.className = "fname";
+      name.textContent = file.filename;
+      const loc = document.createElement("span");
+      loc.className = "floc";
+      loc.textContent = "-> " + fileLocation(file.filename);
+      const dl = document.createElement("button");
+      dl.className = "small-btn";
+      dl.textContent = "Download";
+      dl.addEventListener("click", () => downloadFile(file.filename, file.code));
+      row.appendChild(name);
+      row.appendChild(loc);
+      row.appendChild(dl);
+      pluginFiles.appendChild(row);
+    }
+    logLine("[ForgeAI] generated " + pack.files.length + " verified files for \"" + pack.title + "\"", "ok");
+  }
+
+  pluginSend.addEventListener("click", () => {
+    const text = pluginPrompt.value.trim();
+    if (!text) return;
+    const intent = detectIntent(text);
+    if (intent && intent.pack) {
+      const pack = intent.pack();
+      lastPack = pack;
+      renderPluginFiles(pack);
+    } else {
+      pluginFiles.innerHTML = "";
+      logLine("[ForgeAI] no match for \"" + text + "\" - try: animation kit, hud, combat system, npc ai, data saving", "err");
+    }
+  });
+  pluginPrompt.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") pluginSend.click();
+  });
+
+  /* ----------------------------------------------------------
+     Projects view (localStorage)
+     ---------------------------------------------------------- */
+
+  const projName = $("#projName");
+  const projSave = $("#projSave");
+  const projList = $("#projList");
+  const STORE_KEY = "forgeai_projects";
+
+  function loadProjects() {
+    try {
+      return JSON.parse(localStorage.getItem(STORE_KEY)) || [];
+    } catch (err) {
+      return [];
+    }
+  }
+
+  function saveProjects(list) {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(list));
+    } catch (err) {
+      /* storage full or unavailable - ignore */
+    }
+  }
+
+  function projFlash(msg) {
+    const div = document.createElement("div");
+    div.className = "proj-empty";
+    div.textContent = msg;
+    projList.insertBefore(div, projList.firstChild);
+    setTimeout(() => div.remove(), 2500);
+  }
+
+  function renderProjects() {
+    projList.innerHTML = "";
+    const list = loadProjects();
+    if (!list.length) {
+      const empty = document.createElement("div");
+      empty.className = "proj-empty";
+      empty.textContent = "No projects yet — generate something in the Assistant, then hit \u201cSave current pack\u201d.";
+      projList.appendChild(empty);
+      return;
+    }
+    for (const proj of list) {
+      const card = document.createElement("div");
+      card.className = "proj-card";
+
+      const h3 = document.createElement("h3");
+      h3.textContent = proj.name;
+      card.appendChild(h3);
+
+      const meta = document.createElement("div");
+      meta.className = "proj-meta";
+      meta.textContent = proj.title + " \u2022 " + proj.files.length + " files \u2022 " + new Date(proj.date).toLocaleString();
+      card.appendChild(meta);
+
+      const actions = document.createElement("div");
+      actions.className = "proj-actions";
+
+      const dlBtn = document.createElement("button");
+      dlBtn.className = "small-btn";
+      dlBtn.textContent = "Download all";
+      dlBtn.addEventListener("click", () => downloadAll(proj.files));
+      actions.appendChild(dlBtn);
+
+      const openBtn = document.createElement("button");
+      openBtn.className = "small-btn";
+      openBtn.textContent = "Open";
+      const codeArea = document.createElement("div");
+      codeArea.style.display = "none";
+      openBtn.addEventListener("click", () => {
+        const isHidden = codeArea.style.display === "none";
+        codeArea.style.display = isHidden ? "block" : "none";
+        openBtn.textContent = isHidden ? "Close" : "Open";
+        if (isHidden && !codeArea.childElementCount) {
+          for (const file of proj.files) codeArea.appendChild(renderCodeBlock(file));
+        }
+      });
+      actions.appendChild(openBtn);
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "small-btn danger";
+      delBtn.textContent = "Delete";
+      delBtn.addEventListener("click", () => {
+        const next = loadProjects().filter((p) => p.id !== proj.id);
+        saveProjects(next);
+        renderProjects();
+      });
+      actions.appendChild(delBtn);
+
+      card.appendChild(actions);
+      card.appendChild(codeArea);
+      projList.appendChild(card);
+    }
+  }
+
+  projSave.addEventListener("click", () => {
+    if (!lastPack) {
+      projFlash("Nothing generated yet — ask the Assistant for something first.");
+      return;
+    }
+    const name = projName.value.trim() || lastPack.title;
+    const list = loadProjects();
+    list.unshift({
+      id: "p" + Date.now() + Math.floor(Math.random() * 999),
+      name: name,
+      title: lastPack.title,
+      files: lastPack.files,
+      date: new Date().toISOString(),
+    });
+    saveProjects(list);
+    projName.value = "";
+    renderProjects();
+  });
+
+  /* ----------------------------------------------------------
      Init
      ---------------------------------------------------------- */
 
   renderSuggestions();
+  renderProjects();
   runFixer();
 
   // test hook (no-op in production)

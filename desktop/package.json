@@ -1,0 +1,49 @@
+{
+  "name": "forgeai-desktop",
+  "version": "1.0.0",
+  "description": "ForgeAI - free offline game dev assistant for Roblox Studio and Unreal Engine 5",
+  "main": "main.js",
+  "author": "ForgeAI",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.forgeai.desktop",
+    "productName": "ForgeAI",
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**",
+      "build/**"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ForgeAI"
+    },
+    "portable": {
+      "artifactName": "ForgeAI-portable.exe"
+    },
+    "directories": {
+      "output": "dist"
+    }
+  },
+  "allowScripts": {
+    "electron@33.4.11": true
+  }
+}

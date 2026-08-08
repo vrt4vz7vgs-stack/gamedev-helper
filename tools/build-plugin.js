@@ -165,21 +165,38 @@ if (errs.length) {
 console.log("LuaFixer: plugin source clean (0 errors)");
 
 /* ---------------- site zip (keeps the existing card working) ---------------- */
-const zipper = require("child_process").execFileSync;
-const args = [
-  "a", "-tzip", "-y", "-b", process.env.TEMP,
+// downloads/desktop/ holds the big installers — excluded so the zip stays small.
+const { execFileSync, execSync } = require("child_process");
+const zipArgs = [
+  "a", "-tzip", "-y",
   path.join(ROOT, "ForgeAI-site.zip"),
   "index.html", "css", "js", "plugins", "downloads",
+  "-xr!desktop",
 ];
-try {
-  zipper("7z", args, { cwd: ROOT, stdio: "ignore" });
-  console.log("wrote ForgeAI-site.zip (7z)");
-} catch {
-  const { execSync } = require("child_process");
+const sevenZipCandidates = [
+  "7z",
+  path.join(ROOT, "desktop", "node_modules", "7zip-bin", "win", "x64", "7za.exe"),
+];
+let zipped = false;
+for (const bin of sevenZipCandidates) {
   try {
-    execSync('powershell -NoProfile -Command "Compress-Archive -Force -Path index.html,css,js,plugins,downloads -DestinationPath ForgeAI-site.zip"', { cwd: ROOT, stdio: "ignore" });
+    execFileSync(bin, zipArgs, { cwd: ROOT, stdio: "ignore" });
+    console.log("wrote ForgeAI-site.zip (7z)");
+    zipped = true;
+    break;
+  } catch (err) {
+    /* try next candidate */
+  }
+}
+if (!zipped) {
+  const ps =
+    "Get-ChildItem index.html,css,js,plugins -Recurse | Compress-Archive -Force -DestinationPath ForgeAI-site.zip; " +
+    "Get-ChildItem downloads -Recurse | Where-Object { $_.FullName -notmatch 'desktop' } | Compress-Archive -Update -DestinationPath ForgeAI-site.zip";
+  try {
+    execSync('powershell -NoProfile -Command "' + ps + '"', { cwd: ROOT, stdio: "ignore" });
     console.log("wrote ForgeAI-site.zip (Compress-Archive)");
-  } catch {
+    zipped = true;
+  } catch (err) {
     console.warn("could not create ForgeAI-site.zip - install 7-Zip or run the PowerShell fallback");
   }
 }

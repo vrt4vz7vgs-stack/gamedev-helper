@@ -345,4 +345,6 @@ Plugin.Unloading:Connect(function()
 	dock:Destroy()
 end)
 
+-- show the dock (with the Connect button) as soon as the plugin loads
+dock.Enabled = true
 showHelp()

@@ -9,4 +9,5 @@ contextBridge.exposeInMainWorld("forgeAI", {
   isDesktop: true,
   selectProject: () => ipcRenderer.invoke("forgeai:select-project"),
   writeProjectFiles: (payload) => ipcRenderer.invoke("forgeai:write-project-files", payload),
+  deepseekChat: (payload) => ipcRenderer.invoke("forgeai:deepseek-chat", payload),
 });

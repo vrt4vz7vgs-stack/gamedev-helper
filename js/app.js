@@ -307,25 +307,47 @@
     const typing = showTyping();
     const intent = detectIntent(text);
 
-    setTimeout(() => {
+    const finish = (pack) => {
       typing.remove();
+      if (pack) {
+        lastPack = pack;
+        addAssistantMessage(pack);
+      }
+      sendBtn.disabled = false;
+    };
 
-      if (intent && intent.action) {
+    const fallback = () => {
+      finish(intent ? intent.pack() : HELP_PACK);
+    };
+
+    if (intent && intent.action) {
+      setTimeout(() => {
         intent.action();
-        addAssistantMessage({
+        finish({
           intro: ["I switched you to the <strong>Error Fixer</strong> tab — paste your broken script on the left and I'll fix it instantly."],
           steps: [],
           files: [],
         });
-      } else if (intent) {
-        const pack = intent.pack();
-        lastPack = pack;
-        addAssistantMessage(pack);
-      } else {
-        addAssistantMessage(HELP_PACK);
-      }
-      sendBtn.disabled = false;
-    }, 350 + Math.random() * 250);
+      }, 350);
+      return;
+    }
+
+    if (intent && intent.pack && DeepSeekLib.hasKey()) {
+      DeepSeekLib.generate(text)
+        .then((res) => {
+          if (res.files && res.files.length) {
+            finish({
+              intro: ["DeepSeek V4 generated these files for <strong>" + escapeHtml(text) + "</strong> — every file was checked by the Lua fixer below:"],
+              files: res.files,
+            });
+          } else {
+            fallback();
+          }
+        })
+        .catch(() => fallback());
+    } else {
+      setTimeout(fallback, 350 + Math.random() * 250);
+    }
   }
 
   sendBtn.addEventListener("click", send);
@@ -456,6 +478,11 @@
   const pluginPrompt = $("#pluginPrompt");
   const pluginSend = $("#pluginSend");
   const pluginFiles = $("#pluginFiles");
+  const apiKeyInput = $("#apiKeyInput");
+  const apiConnectBtn = $("#apiConnectBtn");
+  const aiBar = $("#aiBar");
+  const aiDot = $("#aiDot");
+  const aiBarText = $("#aiBarText");
 
   function logLine(text, cls) {
     const p = document.createElement("p");
@@ -465,23 +492,68 @@
     connLog.scrollTop = connLog.scrollHeight;
   }
 
-  let connected = false;
-  connectBtn.addEventListener("click", () => {
-    connected = !connected;
+  function setAiBar(mode, text) {
+    aiDot.className = "ai-dot " + mode;
+    aiBarText.textContent = text;
+  }
+
+  function syncAiState() {
+    const connected = DeepSeekLib.hasKey();
     connDot.classList.toggle("on", connected);
     connLabel.classList.toggle("on", connected);
     connLabel.textContent = connected ? "Connected" : "Disconnected";
     connectBtn.textContent = connected ? "Connected" : "Connect";
     if (connected) {
-      logLine("[ForgeAI] connected to Roblox Studio", "ok");
+      setAiBar("on", "AI connected — DeepSeek V4 (" + DeepSeekLib.MODEL + ") writes your scripts. Type a prompt and hit Generate.");
     } else {
-      logLine("[ForgeAI] disconnected", "err");
+      setAiBar("off", "Offline packs — paste a DeepSeek API key above and click Connect for real AI generation.");
+    }
+  }
+
+  apiKeyInput.value = DeepSeekLib.getKey();
+
+  apiConnectBtn.addEventListener("click", async () => {
+    const key = apiKeyInput.value.trim();
+    if (!key) {
+      logLine("[ForgeAI] paste a DeepSeek API key first (get one at platform.deepseek.com)", "err");
+      apiKeyInput.focus();
+      return;
+    }
+    apiConnectBtn.disabled = true;
+    apiConnectBtn.textContent = "Checking...";
+    setAiBar("off", "Checking your DeepSeek key...");
+    const res = await DeepSeekLib.testKey(key);
+    apiConnectBtn.disabled = false;
+    apiConnectBtn.textContent = "Save key";
+    if (res.ok) {
+      DeepSeekLib.setKey(key);
+      syncAiState();
+      logLine("[ForgeAI] key valid — connected to DeepSeek " + DeepSeekLib.MODEL, "ok");
+    } else {
+      setAiBar("err", res.error);
+      logLine("[ForgeAI] " + res.error, "err");
     }
   });
 
-  function fileLocation(filename) {
-    if (filename === "AnimationKit.lua") return "ReplicatedStorage";
-    if (filename.endsWith(".client.lua")) return "StarterPlayerScripts";
+  connectBtn.addEventListener("click", () => {
+    if (DeepSeekLib.hasKey()) {
+      DeepSeekLib.setKey("");
+      syncAiState();
+      logLine("[ForgeAI] disconnected", "err");
+    } else if (apiKeyInput.value.trim()) {
+      apiConnectBtn.click();
+    } else {
+      apiKeyInput.focus();
+      logLine("[ForgeAI] enter your DeepSeek API key above, then Connect", "err");
+    }
+  });
+
+  syncAiState();
+
+  function fileLocation(file) {
+    if (file.location) return file.location;
+    if (file.filename === "AnimationKit.lua") return "ReplicatedStorage";
+    if (file.filename.endsWith(".client.lua")) return "StarterPlayerScripts";
     return "ServerScriptService";
   }
 
@@ -495,7 +567,7 @@
       name.textContent = file.filename;
       const loc = document.createElement("span");
       loc.className = "floc";
-      loc.textContent = "-> " + fileLocation(file.filename);
+      loc.textContent = "-> " + fileLocation(file);
       const dl = document.createElement("button");
       dl.className = "small-btn";
       dl.textContent = "Download";
@@ -505,12 +577,10 @@
       row.appendChild(dl);
       pluginFiles.appendChild(row);
     }
-    logLine("[ForgeAI] generated " + pack.files.length + " verified files for \"" + pack.title + "\"", "ok");
+    logLine("[ForgeAI] generated " + pack.files.length + " files for \"" + pack.title + "\"", "ok");
   }
 
-  pluginSend.addEventListener("click", () => {
-    const text = pluginPrompt.value.trim();
-    if (!text) return;
+  function fallbackPacks(text) {
     const intent = detectIntent(text);
     if (intent && intent.pack) {
       const pack = intent.pack();
@@ -518,7 +588,39 @@
       renderPluginFiles(pack);
     } else {
       pluginFiles.innerHTML = "";
-      logLine("[ForgeAI] no match for \"" + text + "\" - try: animation kit, hud, combat system, npc ai, data saving", "err");
+      logLine("[ForgeAI] no offline pack for \"" + text + "\" - connect DeepSeek for real generation", "err");
+    }
+  }
+
+  pluginSend.addEventListener("click", () => {
+    const text = pluginPrompt.value.trim();
+    if (!text) return;
+    if (DeepSeekLib.hasKey()) {
+      pluginSend.disabled = true;
+      pluginSend.textContent = "Generating...";
+      logLine("[ForgeAI] asking DeepSeek for \"" + text + "\"...", "dim");
+      DeepSeekLib.generate(text)
+        .then((res) => {
+          if (res.files && res.files.length) {
+            lastPack = { title: "DeepSeek: " + text, files: res.files };
+            renderPluginFiles(lastPack);
+          } else {
+            pluginFiles.innerHTML = "";
+            logLine("[ForgeAI] AI failed: " + (res.error || "no files"), "err");
+            fallbackPacks(text);
+          }
+        })
+        .catch((err) => {
+          pluginFiles.innerHTML = "";
+          logLine("[ForgeAI] " + err.message, "err");
+          fallbackPacks(text);
+        })
+        .finally(() => {
+          pluginSend.disabled = false;
+          pluginSend.textContent = "Generate";
+        });
+    } else {
+      fallbackPacks(text);
     }
   });
   pluginPrompt.addEventListener("keydown", (e) => {

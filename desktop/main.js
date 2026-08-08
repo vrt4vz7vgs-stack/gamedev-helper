@@ -35,8 +35,7 @@ async function findModules(dir) {
   return modules;
 }
 
-ipcMain.handle("forgeai:select-project", async () => {
-  const res = await dialog.showOpenDialog({
+ipcMain.handle("forgeai:select-project", async () => {  const res = await dialog.showOpenDialog({
     title: "Pair ForgeAI to your UE5 project",
     properties: ["openFile"],
     filters: [{ name: "Unreal Engine project", extensions: ["uproject"] }],
@@ -212,6 +211,36 @@ app.whenReady().then(() => {
   });
 
   win.loadFile(path.join(__dirname, "app", "index.html"));
+});
+
+/* ---------------- DeepSeek AI chat (IPC) ----------------
+   Browser CORS blocks api.deepseek.com, so the desktop app
+   calls it from the main process (no CORS restrictions). */
+
+ipcMain.handle("forgeai:deepseek-chat", async (_event, payload) => {
+  const apiKey = payload && payload.apiKey;
+  const messages = (payload && payload.messages) || [];
+  if (!apiKey) {
+    return { ok: false, status: 400, data: { error: { message: "No API key" } } };
+  }
+  try {
+    const res = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + apiKey,
+      },
+      body: JSON.stringify({
+        model: (payload && payload.model) || "deepseek-v4-flash",
+        messages: messages,
+        stream: false,
+      }),
+    });
+    const data = await res.json().catch(() => null);
+    return { ok: res.ok, status: res.status, data: data };
+  } catch (err) {
+    return { ok: false, status: 0, data: { error: { message: String(err && err.message || err) } } };
+  }
 });
 
 app.on("window-all-closed", () => app.quit());
